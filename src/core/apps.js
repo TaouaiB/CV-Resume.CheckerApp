@@ -2,6 +2,10 @@ const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cors = require('cors');
+const mongoose = require('mongoose');
+
+const authRoutes = require('../modules/auth/auth.routes');
+const userRoutes = require('../modules/users/user.routes');
 
 function createApp({ allowedOrigins, env }) {
   const app = express();
@@ -19,6 +23,9 @@ function createApp({ allowedOrigins, env }) {
       credentials: false,
     })
   );
+
+  app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/users', userRoutes);
 
   app.get('/health', async (req, res) => {
     try {
@@ -48,6 +55,17 @@ function createApp({ allowedOrigins, env }) {
         details: error.message,
       });
     }
+  });
+
+  // 404
+  app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+
+  // Error handler
+  app.use((err, req, res, next) => {
+    console.error(err);
+    res
+      .status(err.status || 500)
+      .json({ error: err.message || 'Server error' });
   });
 
   return app;
