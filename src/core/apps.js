@@ -1,0 +1,56 @@
+const express = require('express');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const cors = require('cors');
+
+function createApp({ allowedOrigins, env }) {
+  const app = express();
+  const isDev = env === 'development';
+
+  app.use(helmet());
+  app.use(express.json({ limit: '2mb' }));
+
+  // Dev uses 'dev' format; prod can use 'combined'
+  app.use(morgan(isDev ? 'dev' : 'combined'));
+
+  app.use(
+    cors({
+      origin: allowedOrigins.length ? allowedOrigins : true,
+      credentials: false,
+    })
+  );
+
+  app.get('/health', async (req, res) => {
+    try {
+      const dbStatus = mongoose.connection.readyState;
+      const dbStatusText =
+        {
+          0: 'disconnected',
+          1: 'connected',
+          2: 'connecting',
+          3: 'disconnecting',
+        }[dbStatus] || 'unknown';
+
+      res.json({
+        ok: true,
+        env,
+        ts: Date.now(),
+        database: {
+          status: dbStatusText,
+          readyState: dbStatus,
+          connected: dbStatus === 1,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        error: 'Health check failed',
+        details: error.message,
+      });
+    }
+  });
+
+  return app;
+}
+
+module.exports = { createApp };
