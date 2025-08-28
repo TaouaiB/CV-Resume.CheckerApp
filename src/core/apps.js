@@ -4,6 +4,8 @@ const morgan = require('morgan');
 const cors = require('cors');
 const mongoose = require('mongoose');
 
+const { notFound, errorHandler } = require('./http/errorMiddleware');
+
 const authRoutes = require('../modules/auth/auth.routes');
 const userRoutes = require('../modules/users/user.routes');
 const fileRoutes = require('../modules/files/file.routes');
@@ -59,9 +61,6 @@ function createApp({ allowedOrigins, env }) {
     }
   });
 
-  // 404
-  app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-
   // Error handler
   app.use((err, req, res, next) => {
     console.error(err);
@@ -69,6 +68,9 @@ function createApp({ allowedOrigins, env }) {
       .status(err.status || 500)
       .json({ error: err.message || 'Server error' });
   });
+
+  app.use(notFound);
+  app.use(errorHandler);
 
   return app;
 }
