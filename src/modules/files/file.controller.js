@@ -1,10 +1,17 @@
 // src/modules/files/file.controller.js
 const fs = require('fs');
-const { saveUploadedFile, getOwnedFilePath } = require('./file.service');
+const {
+  saveUploadedFile,
+  getOwnedFilePath,
+  deleteOwnedFile,
+} = require('./file.service');
 
 async function uploadOneCtrl(req, res, next) {
   try {
-    const meta = await saveUploadedFile({ userId: req.user.id, file: req.file });
+    const meta = await saveUploadedFile({
+      userId: req.user.id,
+      file: req.file,
+    });
     res.status(201).json(meta);
   } catch (e) {
     next(e);
@@ -13,12 +20,15 @@ async function uploadOneCtrl(req, res, next) {
 
 async function streamByIdCtrl(req, res, next) {
   try {
-    const { doc, absPath } = await getOwnedFilePath({ userId: req.user.id, fileId: req.params.id });
-
+    const { doc, absPath } = await getOwnedFilePath({
+      userId: req.user.id,
+      fileId: req.params.id,
+    });
     res.setHeader('Content-Type', doc.mimetype);
-    const safeName = encodeURIComponent(doc.originalName || doc.storage.filename);
+    const safeName = encodeURIComponent(
+      doc.originalName || doc.storage.filename
+    );
     res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
-
     const stream = fs.createReadStream(absPath);
     stream.on('error', next);
     stream.pipe(res);
@@ -27,4 +37,13 @@ async function streamByIdCtrl(req, res, next) {
   }
 }
 
-module.exports = { uploadOneCtrl, streamByIdCtrl };
+async function deleteByIdCtrl(req, res, next) {
+  try {
+    await deleteOwnedFile({ userId: req.user.id, fileId: req.params.id });
+    res.status(204).send();
+  } catch (e) {
+    next(e);
+  }
+}
+
+module.exports = { uploadOneCtrl, streamByIdCtrl, deleteByIdCtrl };

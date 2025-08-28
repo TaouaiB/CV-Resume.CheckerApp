@@ -41,9 +41,31 @@ async function getOwnedFilePath({ userId, fileId }) {
   if (!isOwner) throw httpError(403, 'Forbidden');
 
   const absPath = path.resolve(doc.storage.path);
-  if (!fs.existsSync(absPath)) throw httpError(404, 'Stored file missing on server');
+  if (!fs.existsSync(absPath))
+    throw httpError(404, 'Stored file missing on server');
 
   return { doc, absPath };
 }
 
-module.exports = { saveUploadedFile, getOwnedFilePath };
+async function deleteOwnedFile({ userId, fileId }) {
+  const doc = await File.findById(fileId);
+  if (!doc) throw httpError(404, 'File not found');
+
+  const isOwner = String(doc.ownerId) === String(userId);
+  if (!isOwner) throw httpError(403, 'Forbidden');
+
+  // try to remove from disk; ignore if already missing
+  try {
+    const absPath = path.resolve(doc.storage.path);
+    if (fs.existsSync(absPath)) {
+      await fs.promises.unlink(absPath);
+    }
+  } catch (_) {
+    // swallow disk errors (we still remove DB doc)
+  }
+
+  await doc.deleteOne();
+  return { ok: true };
+}
+
+module.exports = { saveUploadedFile, getOwnedFilePath, deleteOwnedFile };
