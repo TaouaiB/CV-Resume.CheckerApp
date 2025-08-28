@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 
 const authRoutes = require('../modules/auth/auth.routes');
 const userRoutes = require('../modules/users/user.routes');
+const fileRoutes = require('../modules/files/file.routes');
 
 function createApp({ allowedOrigins, env }) {
   const app = express();
@@ -26,6 +27,7 @@ function createApp({ allowedOrigins, env }) {
 
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
+  app.use('/api/v1/files', fileRoutes);
 
   app.get('/health', async (req, res) => {
     try {
