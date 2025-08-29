@@ -9,6 +9,7 @@ const { notFound, errorHandler } = require('./http/errorMiddleware');
 const authRoutes = require('../modules/auth/auth.routes');
 const userRoutes = require('../modules/users/user.routes');
 const fileRoutes = require('../modules/files/file.routes');
+const profileRoutes = require('../modules/profiles/profile.routes');
 
 function createApp({ allowedOrigins, env }) {
   const app = express();
@@ -30,6 +31,7 @@ function createApp({ allowedOrigins, env }) {
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
   app.use('/api/v1/files', fileRoutes);
+  app.use('/api/v1/profiles', profileRoutes);
 
   app.get('/health', async (req, res) => {
     try {

@@ -1,3 +1,4 @@
+const { ZodError } = require('zod');
 const { ApiError } = require('../errors/ApiError');
 
 // usage: validate({ body: schema, params: schema, query: schema })
@@ -10,7 +11,7 @@ function validate(schemas = {}) {
       next();
     } catch (e) {
       // Pass Zod error through so errorHandler returns 422 with issues
-      if (e?.name === 'ZodError') return next(e);
+      if (e instanceof ZodError) return next(e);
       return next(ApiError.unprocessable('Validation error', e?.message));
     }
   };
