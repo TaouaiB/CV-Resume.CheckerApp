@@ -2,6 +2,7 @@ const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 
 const { notFound, errorHandler } = require('./http/errorMiddleware');
@@ -17,6 +18,7 @@ function createApp({ allowedOrigins, env }) {
 
   app.use(helmet());
   app.use(express.json({ limit: '2mb' }));
+  app.use(cookieParser());
 
   // Dev uses 'dev' format; prod can use 'combined'
   app.use(morgan(isDev ? 'dev' : 'combined'));

@@ -1,6 +1,6 @@
 const { initEnv, getConfig } = require('./env');
 const { connectDb } = require('./../core/db/connect');
-const { createApp } = require('./apps');
+const { createApp } = require('./app');
 
 async function main() {
   initEnv();
