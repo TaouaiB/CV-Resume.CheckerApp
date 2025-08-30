@@ -19,6 +19,7 @@ const {
 } = require('../../core/http/rateLimiters');
 const { authn } = require('../../security/authn');
 const { resetRequestLimiter } = require('../../core/http/rateLimiters');
+const { forgotBody, resetBody } = require('./reset.validators');
 
 const router = express.Router();
 

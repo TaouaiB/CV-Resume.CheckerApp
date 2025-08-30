@@ -1,7 +1,9 @@
 const devProvider = require('./providers/devConsole.provider');
+const smtpProvider = require('./providers/smtp.provider');
 
 function getProvider() {
   const name = (process.env.MAIL_PROVIDER || 'devConsole').toLowerCase();
+  if (name === 'smtp' || name === 'gmail') return smtpProvider;
   return devProvider;
 }
 
