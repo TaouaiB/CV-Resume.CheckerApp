@@ -1,12 +1,7 @@
 const User = require('../users/user.model');
 const RefreshToken = require('./refreshToken.model');
+const LoginAttempt = require('./loginAttempt.model');
 const { hashPassword, comparePassword } = require('../../security/password');
-const {
-  signAccessToken,
-  signRefreshToken,
-  verifyRefreshToken,
-  refreshDays,
-} = require('../../security/jwt');
 const {
   signAccessToken,
   signRefreshToken,

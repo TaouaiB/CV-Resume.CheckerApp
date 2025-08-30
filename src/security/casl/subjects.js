@@ -4,6 +4,7 @@ module.exports = {
     PROFILE: 'Profile',
     FILE: 'File',
     ANALYSIS: 'Analysis',
+    SESSION: 'Session',
     ALL: 'all',
   },
 };

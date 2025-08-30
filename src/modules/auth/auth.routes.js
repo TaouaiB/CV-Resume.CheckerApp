@@ -2,6 +2,7 @@ const express = require('express');
 const { validate } = require('../../shared/middleware/validate');
 const { registerBody, loginBody } = require('./auth.validators');
 const { verifyRequestBody, verifyConfirmBody } = require('./verify.validators');
+const { forgotBody, resetBody } = require('./reset.validators');
 const {
   registerCtrl,
   loginCtrl,
@@ -12,14 +13,23 @@ const {
   forgotPasswordCtrl,
   resetPasswordCtrl,
 } = require('./auth.controller');
+
+const { authn } = require('../../security/authn');
+const { authorize } = require('../../security/authz');
+const { SUBJECTS } = require('../../security/casl/subjects');
+const RefreshToken = require('./refreshToken.model');
+const { jtiParam } = require('./sessions.validators');
+const {
+  listSessionsCtrl,
+  revokeOneCtrl,
+  revokeAllCtrl,
+} = require('./sessions.controller');
 const {
   loginLimiter,
   registerLimiter,
   verifyRequestLimiter,
+  resetRequestLimiter,
 } = require('../../core/http/rateLimiters');
-const { authn } = require('../../security/authn');
-const { resetRequestLimiter } = require('../../core/http/rateLimiters');
-const { forgotBody, resetBody } = require('./reset.validators');
 
 const router = express.Router();
 
@@ -60,12 +70,25 @@ router.post(
   resetPasswordCtrl
 );
 
-// optional authn for request endpoint: if logged-in, ignore body email
+// sessions (user self-service)
+router.get('/sessions', authn, listSessionsCtrl);
+
+const loadSession = (req) => RefreshToken.findOne({ jti: req.params.jti });
+router.post(
+  '/sessions/:jti/revoke',
+  authn,
+  validate({ params: jtiParam }),
+  authorize('delete', SUBJECTS.SESSION, loadSession),
+  revokeOneCtrl
+);
+
+router.post('/sessions/revoke-all', authn, revokeAllCtrl);
+
+// optional authn for /verify/request
 function authnOptional(req, _res, next) {
   const h = req.headers.authorization || '';
   const token = h.startsWith('Bearer ') ? h.slice(7) : null;
-  if (!token) return next(); // not logged in is fine
-  // reuse existing authn middleware partially
+  if (!token) return next();
   require('../../security/authn').authn(req, _res, next);
 }
 
