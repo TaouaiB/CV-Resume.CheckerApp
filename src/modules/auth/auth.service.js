@@ -1,20 +1,31 @@
 const User = require('../users/user.model');
 const RefreshToken = require('./refreshToken.model');
 const { hashPassword, comparePassword } = require('../../security/password');
-const { signAccessToken, signRefreshToken, verifyRefreshToken, refreshDays } = require('../../security/jwt');
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  refreshDays,
+} = require('../../security/jwt');
 const { ROLES } = require('../../shared/constants/roles');
 const { randomId } = require('../../shared/utils/id');
 const { ApiError } = require('../../shared/errors/ApiError');
 
 function publicUser(u) {
-  return { id: String(u._id), email: u.email, role: u.role, status: u.status, createdAt: u.createdAt };
+  return {
+    id: String(u._id),
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    createdAt: u.createdAt,
+  };
 }
 
 function cookieOpts() {
   const isProd = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    secure: isProd,             // true on HTTPS
+    secure: isProd, // true on HTTPS
     sameSite: 'lax',
     path: '/',
     maxAge: refreshDays * 24 * 60 * 60 * 1000,
@@ -42,13 +53,20 @@ async function login({ email, password, ua, ip }) {
 
 async function issueTokensForUser(user, { ua, ip }) {
   const jti = randomId(16);
-  const payload = { sub: String(user._id), email: user.email, role: user.role };
+  const base = { sub: String(user._id), email: user.email, role: user.role };
 
-  const accessToken  = signAccessToken(payload);
-  const refreshToken = signRefreshToken({ ...payload, typ: 'refresh', jti });
+  // Bind access token to session via `sid`
+  const accessToken = signAccessToken({ ...base, sid: jti });
+  const refreshToken = signRefreshToken({ ...base, typ: 'refresh', jti });
 
   const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
-  await RefreshToken.create({ jti, userId: user._id, expiresAt, userAgent: ua, ip });
+  await RefreshToken.create({
+    jti,
+    userId: user._id,
+    expiresAt,
+    userAgent: ua,
+    ip,
+  });
 
   return { accessToken, refreshToken };
 }
@@ -71,7 +89,10 @@ async function refresh({ token, ua, ip }) {
 
   if (session.revokedAt) {
     // reuse detected or logged out; revoke all user sessions to be safe
-    await RefreshToken.updateMany({ userId: session.userId, revokedAt: { $exists: false } }, { $set: { revokedAt: new Date(), reason: 'reuse-detected' } });
+    await RefreshToken.updateMany(
+      { userId: session.userId, revokedAt: { $exists: false } },
+      { $set: { revokedAt: new Date(), reason: 'reuse-detected' } }
+    );
     throw ApiError.unauthorized('Token reuse detected; all sessions revoked');
   }
   if (session.expiresAt < new Date()) {
@@ -79,12 +100,18 @@ async function refresh({ token, ua, ip }) {
   }
 
   // rotate: mark old as rotated, issue new pair
-  await RefreshToken.updateOne({ _id: session._id }, { $set: { rotatedAt: new Date(), reason: 'rotation' } });
+  await RefreshToken.updateOne(
+    { _id: session._id },
+    { $set: { rotatedAt: new Date(), reason: 'rotation' } }
+  );
 
   const user = await User.findById(session.userId);
   if (!user) throw ApiError.unauthorized('User not found');
 
-  const { accessToken, refreshToken } = await issueTokensForUser(user, { ua, ip });
+  const { accessToken, refreshToken } = await issueTokensForUser(user, {
+    ua,
+    ip,
+  });
   return { accessToken, refreshToken };
 }
 
@@ -93,9 +120,14 @@ async function logout({ token }) {
   try {
     const decoded = verifyRefreshToken(token);
     if (decoded?.jti) {
-      await RefreshToken.updateOne({ jti: decoded.jti }, { $set: { revokedAt: new Date(), reason: 'logout' } });
+      await RefreshToken.updateOne(
+        { jti: decoded.jti },
+        { $set: { revokedAt: new Date(), reason: 'logout' } }
+      );
     }
-  } catch (_) { /* ignore */ }
+  } catch (_) {
+    /* ignore */
+  }
   return { ok: true };
 }
 
