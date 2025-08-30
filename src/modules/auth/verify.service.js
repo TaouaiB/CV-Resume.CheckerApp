@@ -2,9 +2,14 @@ const { randomBytes } = require('crypto');
 const { sha256 } = require('../../shared/utils/hash');
 const { ApiError } = require('../../shared/errors/ApiError');
 const EmailToken = require('./emailToken.model');
+const { sendVerifyEmail } = require('../../notifications/email.service');
 const User = require('../users/user.model');
 const RefreshToken = require('./refreshToken.model');
-const { signAccessToken, signRefreshToken, refreshDays } = require('../../security/jwt');
+const {
+  signAccessToken,
+  signRefreshToken,
+  refreshDays,
+} = require('../../security/jwt');
 
 function ttlMs() {
   const min = Number(process.env.EMAIL_TOKEN_TTL_MIN || 30);
@@ -44,6 +49,7 @@ async function requestVerify({ email, userId, ua, ip }) {
   });
 
   const link = buildVerifyLink(raw);
+  await sendVerifyEmail({ to: user.email, link });
   return { ok: true, link, rawToken: raw }; // caller decides whether to expose raw token (dev only)
 }
 
@@ -78,9 +84,24 @@ async function confirmVerify({ token, ua, ip }) {
   const accessToken = signAccessToken({ ...base, sid: jti });
   const refreshToken = signRefreshToken({ ...base, typ: 'refresh', jti });
   const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
-  await RefreshToken.create({ jti, userId: user._id, expiresAt, userAgent: ua, ip });
+  await RefreshToken.create({
+    jti,
+    userId: user._id,
+    expiresAt,
+    userAgent: ua,
+    ip,
+  });
 
-  return { user: { id: String(user._id), email: user.email, role: user.role, emailVerified: true }, accessToken, refreshToken };
+  return {
+    user: {
+      id: String(user._id),
+      email: user.email,
+      role: user.role,
+      emailVerified: true,
+    },
+    accessToken,
+    refreshToken,
+  };
 }
 
 module.exports = { requestVerify, confirmVerify };
