@@ -9,6 +9,8 @@ const {
   logoutCtrl,
   verifyRequestCtrl,
   verifyConfirmCtrl,
+  forgotPasswordCtrl,
+  resetPasswordCtrl,
 } = require('./auth.controller');
 const {
   loginLimiter,
@@ -16,6 +18,7 @@ const {
   verifyRequestLimiter,
 } = require('../../core/http/rateLimiters');
 const { authn } = require('../../security/authn');
+const { resetRequestLimiter } = require('../../core/http/rateLimiters');
 
 const router = express.Router();
 
@@ -41,6 +44,19 @@ router.post(
   '/verify/confirm',
   validate({ body: verifyConfirmBody }),
   verifyConfirmCtrl
+);
+
+// password reset
+router.post(
+  '/password/forgot',
+  resetRequestLimiter,
+  validate({ body: forgotBody }),
+  forgotPasswordCtrl
+);
+router.post(
+  '/password/reset',
+  validate({ body: resetBody }),
+  resetPasswordCtrl
 );
 
 // optional authn for request endpoint: if logged-in, ignore body email

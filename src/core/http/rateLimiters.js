@@ -24,4 +24,17 @@ const verifyRequestLimiter = rateLimit({
   message: { error: 'Too many verification requests. Try again later.' },
 });
 
-module.exports = { loginLimiter, registerLimiter, verifyRequestLimiter };
+const resetRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1h
+  max: 3, // 3 reset emails per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests. Try again later.' },
+});
+
+module.exports = {
+  loginLimiter,
+  registerLimiter,
+  verifyRequestLimiter,
+  resetRequestLimiter,
+};

@@ -1,5 +1,9 @@
 const { register, login, refresh, logout } = require('./auth.service');
 const { requestVerify, confirmVerify } = require('./verify.service');
+const {
+  requestPasswordReset,
+  confirmPasswordReset,
+} = require('./reset.service');
 
 const COOKIE_NAME = 'rt';
 
@@ -18,20 +22,34 @@ async function registerCtrl(req, res, next) {
   try {
     const ua = req.headers['user-agent'];
     const ip = req.ip;
-    const out = await register({ email: req.body.email, password: req.body.password, ua, ip });
+    const out = await register({
+      email: req.body.email,
+      password: req.body.password,
+      ua,
+      ip,
+    });
     setRtCookie(res, out.refreshToken);
     res.status(201).json({ user: out.user, accessToken: out.accessToken });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 async function loginCtrl(req, res, next) {
   try {
     const ua = req.headers['user-agent'];
     const ip = req.ip;
-    const out = await login({ email: req.body.email, password: req.body.password, ua, ip });
+    const out = await login({
+      email: req.body.email,
+      password: req.body.password,
+      ua,
+      ip,
+    });
     setRtCookie(res, out.refreshToken);
     res.json({ user: out.user, accessToken: out.accessToken });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 async function refreshCtrl(req, res, next) {
@@ -42,7 +60,9 @@ async function refreshCtrl(req, res, next) {
     const out = await refresh({ token, ua, ip });
     setRtCookie(res, out.refreshToken);
     res.json({ accessToken: out.accessToken });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 async function logoutCtrl(req, res, next) {
@@ -51,7 +71,9 @@ async function logoutCtrl(req, res, next) {
     await logout({ token });
     res.clearCookie(COOKIE_NAME, { path: '/' });
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 async function verifyRequestCtrl(req, res, next) {
@@ -68,7 +90,9 @@ async function verifyRequestCtrl(req, res, next) {
       payload.dev = { link: out.link, token: out.rawToken };
     }
     res.json(payload);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 async function verifyConfirmCtrl(req, res, next) {
@@ -78,7 +102,50 @@ async function verifyConfirmCtrl(req, res, next) {
     const out = await confirmVerify({ token: req.body.token, ua, ip });
     setRtCookie(res, out.refreshToken);
     res.json({ user: out.user, accessToken: out.accessToken });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
-module.exports = { registerCtrl, loginCtrl, refreshCtrl, logoutCtrl, verifyRequestCtrl, verifyConfirmCtrl };
+async function forgotPasswordCtrl(req, res, next) {
+  try {
+    const ua = req.headers['user-agent'];
+    const ip = req.ip;
+    const { email } = req.body || {};
+    const out = await requestPasswordReset({ email, ua, ip });
+    const payload = { ok: true };
+    if (
+      (process.env.MAIL_PROVIDER || 'devConsole') === 'devConsole' &&
+      out.rawToken
+    ) {
+      payload.dev = { link: out.link, token: out.rawToken };
+    }
+    res.json(payload);
+  } catch (e) {
+    next(e);
+  }
+}
+
+async function resetPasswordCtrl(req, res, next) {
+  try {
+    const ua = req.headers['user-agent'];
+    const ip = req.ip;
+    const { token, newPassword } = req.body || {};
+    const out = await confirmPasswordReset({ token, newPassword, ua, ip });
+    setRtCookie(res, out.refreshToken);
+    res.json({ user: out.user, accessToken: out.accessToken });
+  } catch (e) {
+    next(e);
+  }
+}
+
+module.exports = {
+  registerCtrl,
+  loginCtrl,
+  refreshCtrl,
+  logoutCtrl,
+  verifyRequestCtrl,
+  verifyConfirmCtrl,
+  forgotPasswordCtrl,
+  resetPasswordCtrl,
+};
