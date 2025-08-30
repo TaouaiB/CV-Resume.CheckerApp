@@ -11,6 +11,7 @@ class ApiError extends Error {
   static conflict(msg = 'Conflict') { return new ApiError(409, msg); }
   static unprocessable(msg = 'Validation error', details) { return new ApiError(422, msg, details); }
   static tooMany(msg = 'Too many requests') { return new ApiError(429, msg); }
+  static locked(msg = 'Account locked') { return new ApiError(423, msg); } 
   static server(msg = 'Server error') { return new ApiError(500, msg); }
 }
 module.exports = { ApiError };

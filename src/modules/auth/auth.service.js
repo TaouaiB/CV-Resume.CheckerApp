@@ -7,6 +7,12 @@ const {
   verifyRefreshToken,
   refreshDays,
 } = require('../../security/jwt');
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  refreshDays,
+} = require('../../security/jwt');
 const { ROLES } = require('../../shared/constants/roles');
 const { randomId } = require('../../shared/utils/id');
 const { ApiError } = require('../../shared/errors/ApiError');
@@ -42,12 +48,96 @@ async function register({ email, password, ua, ip }) {
   return { user: publicUser(user), ...out };
 }
 
+const LOCK_MAX_ATTEMPTS = Number(process.env.AUTH_LOCK_MAX_ATTEMPTS || 5); // max failed attempts
+const LOCK_WINDOW_MIN = Number(process.env.AUTH_LOCK_WINDOW_MIN || 15); // rolling window
+const LOCK_DURATION_MIN = Number(process.env.AUTH_LOCK_DURATION_MIN || 15); // lock duration
+
 async function login({ email, password, ua, ip }) {
   const user = await User.findOne({ email });
-  if (!user) throw ApiError.unauthorized('Invalid credentials');
+
+  // Unknown email → still log attempt, but generic error
+  if (!user) {
+    await LoginAttempt.create({
+      email,
+      ip,
+      userAgent: ua,
+      success: false,
+      reason: 'invalid-credentials',
+    });
+    throw ApiError.unauthorized('Invalid credentials');
+  }
+
+  // Hard block
+  if (user.status && user.status !== 'ACTIVE') {
+    await LoginAttempt.create({
+      email,
+      userId: user._id,
+      ip,
+      userAgent: ua,
+      success: false,
+      reason: 'blocked',
+    });
+    throw ApiError.forbidden('Account is not active');
+  }
+
+  // Lockout check
+  const now = new Date();
+  if (user.lockUntil && user.lockUntil > now) {
+    await LoginAttempt.create({
+      email,
+      userId: user._id,
+      ip,
+      userAgent: ua,
+      success: false,
+      reason: 'locked',
+    });
+    throw ApiError.locked(
+      `Account temporarily locked. Try again after ${Math.ceil((user.lockUntil - now) / 60000)} minutes`
+    );
+  }
+
+  // Password check
   const ok = await comparePassword(password, user.passwordHash);
-  if (!ok) throw ApiError.unauthorized('Invalid credentials');
+  if (!ok) {
+    // rolling window update
+    const windowStart = user.lastFailedAt ? user.lastFailedAt.getTime() : 0;
+    const inWindow = now.getTime() - windowStart <= LOCK_WINDOW_MIN * 60 * 1000;
+    user.failedLoginCount = inWindow ? user.failedLoginCount + 1 : 1;
+    user.lastFailedAt = now;
+
+    // apply lock if threshold reached
+    if (user.failedLoginCount >= LOCK_MAX_ATTEMPTS) {
+      user.lockUntil = new Date(now.getTime() + LOCK_DURATION_MIN * 60 * 1000);
+      user.failedLoginCount = 0; // reset counter after lock
+    }
+    await user.save();
+    await LoginAttempt.create({
+      email,
+      userId: user._id,
+      ip,
+      userAgent: ua,
+      success: false,
+      reason: 'invalid-credentials',
+    });
+    throw ApiError.unauthorized('Invalid credentials');
+  }
+
+  // success → reset counters
+  if (user.failedLoginCount || user.lastFailedAt || user.lockUntil) {
+    user.failedLoginCount = 0;
+    user.lastFailedAt = undefined;
+    user.lockUntil = undefined;
+    await user.save();
+  }
+
   const out = await issueTokensForUser(user, { ua, ip });
+  await LoginAttempt.create({
+    email,
+    userId: user._id,
+    ip,
+    userAgent: ua,
+    success: true,
+  });
   return { user: publicUser(user), ...out };
 }
 
