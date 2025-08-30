@@ -1,4 +1,5 @@
 const { register, login, refresh, logout } = require('./auth.service');
+const { requestVerify, confirmVerify } = require('./verify.service');
 
 const COOKIE_NAME = 'rt';
 
@@ -35,7 +36,7 @@ async function loginCtrl(req, res, next) {
 
 async function refreshCtrl(req, res, next) {
   try {
-    const token = req.cookies?.rt || req.body?.refreshToken; // prefer cookie
+    const token = req.cookies?.rt || req.body?.refreshToken;
     const ua = req.headers['user-agent'];
     const ip = req.ip;
     const out = await refresh({ token, ua, ip });
@@ -53,4 +54,31 @@ async function logoutCtrl(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { registerCtrl, loginCtrl, refreshCtrl, logoutCtrl };
+async function verifyRequestCtrl(req, res, next) {
+  try {
+    const ua = req.headers['user-agent'];
+    const ip = req.ip;
+    const userId = req.user?.id;
+    const email = req.body?.email;
+    const out = await requestVerify({ email, userId, ua, ip });
+
+    // Don’t leak tokens in prod; expose in dev to simplify testing
+    const payload = { ok: true };
+    if ((process.env.MAIL_PROVIDER || 'devConsole') === 'devConsole') {
+      payload.dev = { link: out.link, token: out.rawToken };
+    }
+    res.json(payload);
+  } catch (e) { next(e); }
+}
+
+async function verifyConfirmCtrl(req, res, next) {
+  try {
+    const ua = req.headers['user-agent'];
+    const ip = req.ip;
+    const out = await confirmVerify({ token: req.body.token, ua, ip });
+    setRtCookie(res, out.refreshToken);
+    res.json({ user: out.user, accessToken: out.accessToken });
+  } catch (e) { next(e); }
+}
+
+module.exports = { registerCtrl, loginCtrl, refreshCtrl, logoutCtrl, verifyRequestCtrl, verifyConfirmCtrl };
